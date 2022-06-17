@@ -157,7 +157,7 @@ class LSTM(nn.Module):
 class ConvLSTM(nn.Module):
     def __init__(self, sequence_length=5, num_classes=26, cnn_layers=None,
                  cnn_input_dim=1, rnn_input_dim=256,
-                 cnn_hidden_size=256, rnn_hidden_size=512, rnn_num_layers=1, rnn_dropout=0 ):
+                 cnn_hidden_size=256, rnn_hidden_size=512, rnn_num_layers=1, rnn_dropout=0, teacher_forcing=False):
         # NOTE: you can freely add hyperparameters argument
         super(ConvLSTM, self).__init__()
 
@@ -170,10 +170,11 @@ class ConvLSTM(nn.Module):
         self.rnn_dropout = rnn_dropout
         self.sequence_length = sequence_length
         self.num_classes = num_classes
+        self.teacher_forcing = teacher_forcing
         ##############################################################################
         #                          IMPLEMENT YOUR CODE                               #
         ##############################################################################
-        self.conv = CustomCNN()
+        self.conv = CustomCNN(self.cnn_input_dim, self.cnn_hidden_size)
         self.lstm = LSTM(self.rnn_input_dim, self.rnn_hidden_size, self.rnn_num_layers, self.rnn_dropout)
         # NOTE: you can define additional parameters
         ##############################################################################
@@ -210,9 +211,17 @@ class ConvLSTM(nn.Module):
         if have_labels:
             # training code ...
             # teacher forcing by concatenating ()
+            if self.teacher_forcing:
+                conv_out = self.conv(images)
+                outputs = self.lstm(labels)
+            else:
+                conv_out = self.conv(images)
+                outputs = self.lstm(conv_out)
 
         else:
             # evaluation code ...
+            conv_out = self.conv(images)
+            outputs = self.lstm(conv_out)
 
         ##############################################################################
         #                          END OF YOUR CODE                                  #
