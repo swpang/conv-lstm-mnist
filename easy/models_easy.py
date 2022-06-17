@@ -6,7 +6,7 @@ import numpy as np
 
 
 class CustomCNN(nn.Module):
-    def __init__(self):
+    def __init__(self, cnn_input_size, cnn_hidden_size):
         # NOTE: you can freely add hyperparameters argument
         super(CustomCNN, self).__init__()
         ##############################################################################
@@ -15,8 +15,11 @@ class CustomCNN(nn.Module):
         # Problem1-1: define cnn model        
         # ResNet
 
+        self.cnn_input_size = cnn_input_size
+        self.cnn_hidden_size = cnn_hidden_size
+
         self.conv1 = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=64, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.Conv2d(in_channels=cnn_input_size, out_channels=64, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(num_features=64, momentum=0.9),
             nn.ReLU(True),
         )
@@ -41,17 +44,17 @@ class CustomCNN(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2)
         )
         self.conv4 = nn.Sequential(
-            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=256, momentum=0.9),
+            nn.Conv2d(in_channels=256, out_channels=cnn_hidden_size, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(num_features=cnn_hidden_size, momentum=0.9),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2)
         )
         self.resblock2 = nn.Sequential(
-            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(num_features=256, momentum=0.9),
+            nn.Conv2d(in_channels=cnn_hidden_size, out_channels=cnn_hidden_size, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(num_features=cnn_hidden_size, momentum=0.9),
             nn.ReLU(True),
-            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(num_features=256, momentum=0.9),
+            nn.Conv2d(in_channels=cnn_hidden_size, out_channels=cnn_hidden_size, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(num_features=cnn_hidden_size, momentum=0.9),
             nn.ReLU(True)
         )
 
@@ -72,12 +75,20 @@ class CustomCNN(nn.Module):
         ##############################################################################
         # Problem1-2: code CNN forward path
 
-        out = self.conv2(self.conv1(inputs))
-        residual = out
-        out = self.resblock1(out) + residual
-        out = self.conv4(self.conv3(out))
-        residual = out
-        out = self.resblock2(out) + residual
+        outputs = np.zeros(inputs.shape[0], self.cnn_hidden_size)
+
+        for x in inputs[,:,,,]:
+            x = x.squeeze()
+
+            out = self.conv2(self.conv1(x))
+            residual = out
+            out = self.resblock1(out) + residual
+            out = self.conv4(self.conv3(out))
+            residual = out
+            out = self.resblock2(out) + residual
+            out = out.view(-1, out.shape[1] * out.shape[2] * out.shape[3])
+            out = nn.Linear(out.shape[0] * out.shape[1] * out.shape[2] * out.shape[3], self.cnn_hidden_size)
+            outputs = torch.cat([outputs, out], dim=0)
 
         ##############################################################################
         #                          END OF YOUR CODE                                  #
@@ -127,7 +138,7 @@ class LSTM(nn.Module):
         #                          END OF YOUR CODE                                  #
         ##############################################################################
 
-        # (sequence_lenth, batch, num_classes), (num_rnn_layers, batch, hidden_dim), (num_rnn_layers, batch, hidden_dim)
+        # (sequence_length, batch, num_classes), (num_rnn_layers, batch, hidden_dim), (num_rnn_layers, batch, hidden_dim)
         return output, h_next, c_next
 
 
@@ -187,6 +198,7 @@ class ConvLSTM(nn.Module):
         if have_labels:
             # training code ...
             # teacher forcing by concatenating ()
+
         else:
             # evaluation code ...
 
