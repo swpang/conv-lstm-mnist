@@ -5,6 +5,9 @@ import torch.nn.functional as F
 import numpy as np
 
 
+def weights_init(m):
+    torch.nn.init.xavier_uniform(m.weight)
+
 class CustomCNN(nn.Module):
     def __init__(self, cnn_input_size, cnn_hidden_size):
         # NOTE: you can freely add hyperparameters argument
@@ -75,6 +78,13 @@ class CustomCNN(nn.Module):
         ##############################################################################
         # Problem1-2: code CNN forward path
 
+        self.conv1.apply(weights_init)
+        self.conv2.apply(weights_init)
+        self.conv3.apply(weights_init)
+        self.conv4.apply(weights_init)
+        self.resblock1.apply(weights_init)
+        self.resblock2.apply(weights_init)
+
         outputs = np.zeros(inputs.shape[0], self.cnn_hidden_size)
 
         for x in inputs[,:,,,]:
@@ -115,6 +125,7 @@ class LSTM(nn.Module):
         self.lstm = nn.LSTM(input_size=hidden_size, hidden_size=hidden_size, num_layers=num_layers, dropout=dropout)
         self.fc_in = nn.Linear(vocab_size, hidden_size)
         self.fc_out = nn.Linear(hidden_size, vocab_size)
+        self.relu = nn.ReLU(True)
 
         ##############################################################################
         #                          END OF YOUR CODE                                  #
@@ -133,6 +144,7 @@ class LSTM(nn.Module):
 
         feature = self.fc_in(feature)
         output, h_next, c_next = self.lstm(feature, (h, c))
+        output = self.relu(self.fc_out(self.relu(output)))
 
         ##############################################################################
         #                          END OF YOUR CODE                                  #
@@ -178,10 +190,10 @@ class ConvLSTM(nn.Module):
 
         # for teacher-forcing
         have_labels = False
-        if len(inputs) == 2:
+        if len(inputs) == 2:    # Training
             have_labels = True
             images, labels = inputs
-        else:
+        else:                   # Test
             images = inputs
 
         ##############################################################################
