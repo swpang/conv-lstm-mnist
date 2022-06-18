@@ -9,7 +9,7 @@ def weights_init(m):
     torch.nn.init.xavier_uniform_(m.weight)
 
 class CustomCNN(nn.Module):
-    def __init__(self, cnn_input_size, cnn_hidden_size):
+    def __init__(self, cnn_input_size, cnn_hidden_size, rnn_hidden_size):
         # NOTE: you can freely add hyperparameters argument
         super(CustomCNN, self).__init__()
         ##############################################################################
@@ -20,6 +20,7 @@ class CustomCNN(nn.Module):
 
         self.cnn_input_size = cnn_input_size
         self.cnn_hidden_size = cnn_hidden_size
+        self.rnn_hidden_size = rnn_hidden_size
 
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels=cnn_input_size, out_channels=64, kernel_size=3, stride=1, padding=1, bias=False),
@@ -62,6 +63,7 @@ class CustomCNN(nn.Module):
         )
 
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.relu = nn.ReLU(True)
 
         ##############################################################################
         #                          END OF YOUR CODE                                  #
@@ -87,16 +89,19 @@ class CustomCNN(nn.Module):
 
         outputs = []
 
-        for x in enumerate(inputs):
+        # Iterate on batches
+        for x in inputs:
             out = self.conv2(self.conv1(x))
             residual = out
             out = self.resblock1(out) + residual
             out = self.conv4(self.conv3(out))
             residual = out
-            out = self.resblock2(out) + residual
-            out = out.view(-1, out.shape[1] * out.shape[2] * out.shape[3])
-            out = nn.Linear(out.shape[1] * out.shape[2] * out.shape[3], self.cnn_hidden_size)
-            outputs.append(out)
+            out = self.resblock2(out) + residual # out = [S, C, H, W]
+            out = out.view(-1, out.size(1) * out.size(2) * out.size(3))
+
+            fc1 = nn.Linear(out.size(1), self.rnn_hidden_size).cuda()
+
+            outputs.append(self.relu(fc1(out)))
 
         ##############################################################################
         #                          END OF YOUR CODE                                  #
@@ -105,13 +110,15 @@ class CustomCNN(nn.Module):
 
 
 class LSTM(nn.Module):
-    def __init__(self, input_dim, hidden_size, vocab_size, num_layers=1, dropout=0.0):
+    def __init__(self, input_dim, hidden_size, vocab_size, num_layers=1, dropout=0):
         super(LSTM, self).__init__()
 
         # define the properties
         self.input_dim = input_dim
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
+        self.num_layers = num_layers
+        self.dropout = dropout
 
         ##############################################################################
         #                          IMPLEMENT YOUR CODE                               #
@@ -120,9 +127,9 @@ class LSTM(nn.Module):
         # output fully connected layer to project to the size of the class
 
         # you can either use torch LSTM or manually define it
-        self.lstm = nn.LSTM(input_size=hidden_size, hidden_size=hidden_size, num_layers=num_layers, dropout=dropout)
-        self.fc_in = nn.Linear(vocab_size, hidden_size)
-        self.fc_out = nn.Linear(hidden_size, vocab_size)
+        self.lstm = nn.LSTM(input_size=self.input_dim, hidden_size=self.hidden_size, num_layers=self.num_layers, dropout=self.dropout)
+        self.fc_in = nn.Linear(self.hidden_size, self.hidden_size)
+        self.fc_out = nn.Linear(self.hidden_size, self.vocab_size)
         self.relu = nn.ReLU(True)
 
         ##############################################################################
@@ -174,7 +181,7 @@ class ConvLSTM(nn.Module):
         ##############################################################################
         #                          IMPLEMENT YOUR CODE                               #
         ##############################################################################
-        self.conv = CustomCNN(self.cnn_input_dim, self.cnn_hidden_size)
+        self.conv = CustomCNN(self.cnn_input_dim, self.cnn_hidden_size, self.rnn_hidden_size)
         self.lstm = LSTM(self.rnn_input_dim, self.rnn_hidden_size, self.rnn_num_layers, self.rnn_dropout)
         # NOTE: you can define additional parameters
         ##############################################################################
@@ -213,14 +220,13 @@ class ConvLSTM(nn.Module):
         if have_labels:
             # training code ...
             # teacher forcing by concatenating ()
+            conv_outs = self.conv(images)
             if self.teacher_forcing:
                 # output of conv is a list with dim B x [L, H]
-                conv_outs = self.conv(images)
                 for label in labels:
                     output, _, _ = self.lstm(label, hidden_state, cell_state)
                     outputs.append(output)
             else:
-                conv_outs = self.conv(images)
                 for conv_out in conv_outs:
                     output, _, _ = self.lstm(conv_out, hidden_state, cell_state)
                     outputs.append(output)
@@ -229,7 +235,7 @@ class ConvLSTM(nn.Module):
             # evaluation code ...
             conv_outs = self.conv(images)
             for conv_out in conv_outs:
-                output, _, _ = self.lstm(conv_out)
+                output, _, _ = self.lstm(conv_out, hidden_state, cell_state)
                 outputs.append(output)
 
         ##############################################################################
