@@ -106,7 +106,7 @@ class CustomCNN(nn.Module):
 
             outputs = torch.cat([outputs, out.unsqueeze(0)], dim=0)
 
-        outputs = torch.swapaxes(outputs[1:,:,:], 0, 1) # outputs = [S, B, H]
+        outputs = outputs[1:,:,:].transpose(0, 1) # outputs = [S, B, H]
 
         ##############################################################################
         #                          END OF YOUR CODE                                  #
@@ -133,7 +133,7 @@ class LSTM(nn.Module):
 
         # you can either use torch LSTM or manually define it
         self.lstm = nn.LSTM(input_size=self.input_dim, hidden_size=self.hidden_size, num_layers=self.num_layers, dropout=self.dropout)
-        self.fc_in = nn.Linear(self.input_dim, self.hidden_size)
+        self.fc_in = nn.Linear(self.input_dim, self.input_dim)
         self.fc_out = nn.Linear(self.hidden_size, self.vocab_size)
         self.relu = nn.ReLU(True)
 
@@ -187,7 +187,7 @@ class ConvLSTM(nn.Module):
         #                          IMPLEMENT YOUR CODE                               #
         ##############################################################################
         self.conv = CustomCNN(self.cnn_input_dim, self.cnn_hidden_size, self.rnn_input_dim)
-        self.lstm = LSTM(self.rnn_input_dim, self.rnn_hidden_size, self.rnn_num_layers, self.rnn_dropout)
+        self.lstm = LSTM(self.rnn_input_dim, self.rnn_hidden_size, self.num_classes, self.rnn_num_layers, self.rnn_dropout)
         # NOTE: you can define additional parameters
         ##############################################################################
         #                          END OF YOUR CODE                                  #
@@ -217,8 +217,8 @@ class ConvLSTM(nn.Module):
         # NOTE: you can use teacher-forcing using labels or not
         # NOTE: you can modify below hint code
 
-        hidden_state = torch.zeros(self.batch_size, self.rnn_hidden_size)
-        cell_state = torch.zeros(self.batch_size, self.rnn_hidden_size)
+        hidden_state = torch.zeros(self.rnn_num_layers, self.batch_size, self.rnn_hidden_size)
+        cell_state = torch.zeros(self.rnn_num_layers, self.batch_size, self.rnn_hidden_size)
 
         outputs = []
 
