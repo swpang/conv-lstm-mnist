@@ -6,7 +6,7 @@ import numpy as np
 
 
 def weights_init(m):
-    torch.nn.init.xavier_uniform(m.weight)
+    torch.nn.init.xavier_uniform_(m.weight)
 
 class CustomCNN(nn.Module):
     def __init__(self, cnn_input_size, cnn_hidden_size):
@@ -70,8 +70,8 @@ class CustomCNN(nn.Module):
     def forward(self, inputs):
         """
         For reference (shape example)
-        inputs: Batch size X (Sequence_length, Channel=1, Height, Width)
-        outputs: (Sequence_length X Batch_size, Hidden_dim)
+        inputs: Batch size X (Sequence_length, Channel=1, Height, Width) -> this is a list
+        outputs: (Sequence_length X Batch_size, Hidden_dim) -> this is a list
         """
         ##############################################################################
         #                          IMPLEMENT YOUR CODE                               #
@@ -85,11 +85,9 @@ class CustomCNN(nn.Module):
         self.resblock1.apply(weights_init)
         self.resblock2.apply(weights_init)
 
-        outputs = np.zeros(inputs.shape[0], self.cnn_hidden_size)
+        outputs = []
 
-        for x in inputs[,:,,,]:
-            x = x.squeeze()
-
+        for x in enumerate(inputs):
             out = self.conv2(self.conv1(x))
             residual = out
             out = self.resblock1(out) + residual
@@ -97,8 +95,8 @@ class CustomCNN(nn.Module):
             residual = out
             out = self.resblock2(out) + residual
             out = out.view(-1, out.shape[1] * out.shape[2] * out.shape[3])
-            out = nn.Linear(out.shape[0] * out.shape[1] * out.shape[2] * out.shape[3], self.cnn_hidden_size)
-            outputs = torch.cat([outputs, out], dim=0)
+            out = nn.Linear(out.shape[1] * out.shape[2] * out.shape[3], self.cnn_hidden_size)
+            outputs.append(out)
 
         ##############################################################################
         #                          END OF YOUR CODE                                  #
@@ -157,7 +155,8 @@ class LSTM(nn.Module):
 class ConvLSTM(nn.Module):
     def __init__(self, sequence_length=5, num_classes=26, cnn_layers=None,
                  cnn_input_dim=1, rnn_input_dim=256,
-                 cnn_hidden_size=256, rnn_hidden_size=512, rnn_num_layers=1, rnn_dropout=0, teacher_forcing=False):
+                 cnn_hidden_size=256, rnn_hidden_size=512, rnn_num_layers=1,
+                 rnn_dropout=0, teacher_forcing=False, batch_size=256):
         # NOTE: you can freely add hyperparameters argument
         super(ConvLSTM, self).__init__()
 
@@ -171,6 +170,7 @@ class ConvLSTM(nn.Module):
         self.sequence_length = sequence_length
         self.num_classes = num_classes
         self.teacher_forcing = teacher_forcing
+        self.batch_size = batch_size
         ##############################################################################
         #                          IMPLEMENT YOUR CODE                               #
         ##############################################################################
@@ -190,6 +190,7 @@ class ConvLSTM(nn.Module):
         """
 
         # for teacher-forcing
+        # images, labels are both lists of data - one element = one batch
         have_labels = False
         if len(inputs) == 2:    # Training
             have_labels = True
@@ -204,24 +205,32 @@ class ConvLSTM(nn.Module):
         # NOTE: you can use teacher-forcing using labels or not
         # NOTE: you can modify below hint code
 
-        batch_size = inputs.shape[0]
-        hidden_state = torch.zeros()
-        cell_state = torch.zeros()
+        hidden_state = torch.zeros(self.batch_size, self.rnn_hidden_size)
+        cell_state = torch.zeros(self.batch_size, self.rnn_hidden_size)
+
+        outputs = []
 
         if have_labels:
             # training code ...
             # teacher forcing by concatenating ()
             if self.teacher_forcing:
-                conv_out = self.conv(images)
-                outputs = self.lstm(labels)
+                # output of conv is a list with dim B x [L, H]
+                conv_outs = self.conv(images)
+                for label in labels:
+                    output, _, _ = self.lstm(label, hidden_state, cell_state)
+                    outputs.append(output)
             else:
-                conv_out = self.conv(images)
-                outputs = self.lstm(conv_out)
+                conv_outs = self.conv(images)
+                for conv_out in conv_outs:
+                    output, _, _ = self.lstm(conv_out, hidden_state, cell_state)
+                    outputs.append(output)
 
         else:
             # evaluation code ...
-            conv_out = self.conv(images)
-            outputs = self.lstm(conv_out)
+            conv_outs = self.conv(images)
+            for conv_out in conv_outs:
+                output, _, _ = self.lstm(conv_out)
+                outputs.append(output)
 
         ##############################################################################
         #                          END OF YOUR CODE                                  #
