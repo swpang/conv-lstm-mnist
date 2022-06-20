@@ -5,66 +5,42 @@ import torch.nn.functional as F
 import numpy as np
 
 
-def weights_init(m):
-    if isinstance(m, nn.Conv2d):
-        torch.nn.init.xavier_uniform_(m.weight)
-
 class CustomCNN(nn.Module):
-    def __init__(self, cnn_input_size, cnn_hidden_size, rnn_input_dim):
+    def __init__(self, cnn_input_size, cnn_hidden_size, vocab_size):
         # NOTE: you can freely add hyperparameters argument
         super(CustomCNN, self).__init__()
         ##############################################################################
         #                          IMPLEMENT YOUR CODE                               #
         ##############################################################################
         # Problem1-1: define cnn model        
-        # ResNet
+        # VGG16
 
         self.cnn_input_size = cnn_input_size
         self.cnn_hidden_size = cnn_hidden_size
-        self.rnn_input_dim = rnn_input_dim
+        self.vocab_size = vocab_size
 
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(in_channels=cnn_input_size, out_channels=64, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=64, momentum=0.9),
-            nn.ReLU(True),
-        )
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=128, momentum=0.9),
-            nn.ReLU(True),
-            nn.MaxPool2d(kernel_size=2, stride=2)
-        )
-        self.resblock1 = nn.Sequential(
-            nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(num_features=128, momentum=0.9),
-            nn.ReLU(True),
-            nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(num_features=128, momentum=0.9),
-            nn.ReLU(True)
-        )
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=256, momentum=0.9),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2)
-        )
-        self.conv4 = nn.Sequential(
-            nn.Conv2d(in_channels=256, out_channels=cnn_hidden_size, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=cnn_hidden_size, momentum=0.9),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2)
-        )
-        self.resblock2 = nn.Sequential(
-            nn.Conv2d(in_channels=cnn_hidden_size, out_channels=cnn_hidden_size, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(num_features=cnn_hidden_size, momentum=0.9),
-            nn.ReLU(True),
-            nn.Conv2d(in_channels=cnn_hidden_size, out_channels=cnn_hidden_size, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(num_features=cnn_hidden_size, momentum=0.9),
-            nn.ReLU(True)
-        )
+        self.conv1_1 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=3, padding=1)
+        self.conv1_2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
 
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv2_1 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
+        self.conv2_2 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1)
+
+        self.conv3_1 = nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1)
+        self.conv3_2 = nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, padding=1)
+        self.conv3_3 = nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, padding=1)
+
+        self.conv4_1 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, padding=1)
+        self.conv4_2 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
+        self.conv4_3 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
+
+        self.conv5_1 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
+        self.conv5_2 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
+        self.conv5_3 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
+
+        self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.relu = nn.ReLU(True)
+
+        self.fc = nn.Linear(512 * 7 * 7, self.vocab_size)
 
         ##############################################################################
         #                          END OF YOUR CODE                                  #
@@ -73,46 +49,48 @@ class CustomCNN(nn.Module):
     def forward(self, inputs):
         """
         For reference (shape example)
-        inputs: Batch size X (Sequence_length, Channel=1, Height, Width) -> this is a list
-        outputs: (Sequence_length X Batch_size, Hidden_dim) -> this is a list
+        inputs: [Batch size x Sequence_length, Channel=1, Height, Width]
+        outputs: [Sequence_length X Batch_size, Hidden_dim]
         """
         ##############################################################################
         #                          IMPLEMENT YOUR CODE                               #
         ##############################################################################
         # Problem1-2: code CNN forward path
 
-        self.conv1.apply(weights_init)
-        self.conv2.apply(weights_init)
-        self.conv3.apply(weights_init)
-        self.conv4.apply(weights_init)
-        self.resblock1.apply(weights_init)
-        self.resblock2.apply(weights_init)
+        inputs = inputs.cuda()
 
-        outputs = torch.zeros(len(inputs), inputs[0].size(0), self.rnn_input_dim).cuda() # outputs = [S, B, H]
+        out = self.relu(self.conv1_2(self.relu(self.conv1_1(inputs))))
 
-        # Iterate on batches
-        for x in inputs:
-            out = self.conv2(self.conv1(x.cuda()))
-            residual = out
-            out = self.resblock1(out) + residual
-            out = self.conv4(self.conv3(out))
-            residual = out
-            out = self.resblock2(out) + residual # out = [S, C, H, W]
-            out = out.view(-1, out.size(1) * out.size(2) * out.size(3))
+        out = self.relu(self.conv2_2(self.relu(self.conv2_1(out))))
+        out = self.maxpool(out)
 
-            fc1 = nn.Linear(out.size(1), self.rnn_input_dim).cuda()
+        out = self.relu(self.conv3_3(self.relu(self.conv3_2(self.relu(self.conv3_1(out))))))
 
-            out = self.relu(fc1(out)) # out = [S, H]
+        out = self.relu(self.conv4_3(self.relu(self.conv4_2(self.relu(self.conv4_1(out))))))
 
-            outputs = torch.cat([outputs, out.unsqueeze(0)], dim=0)
+        out = self.relu(self.conv5_3(self.relu(self.conv5_2(self.relu(self.conv5_1(out))))))
+        out = self.maxpool(out)
 
-        outputs = outputs[1:,:,:].transpose(0, 1) # outputs = [S, B, H]
+        out = out.view(-1, out.size(1) * out.size(2) * out.size(3))
+        outputs = self.relu(self.fc(out)) # outputs = [BS, Hidden]
 
         ##############################################################################
         #                          END OF YOUR CODE                                  #
         ##############################################################################
         return outputs
 
+    def weights_init(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                torch.nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                nn.init.constant_(m.bias, 0)
 
 class LSTM(nn.Module):
     def __init__(self, input_dim, hidden_size, vocab_size, num_layers=1, dropout=0):
@@ -132,16 +110,16 @@ class LSTM(nn.Module):
         # output fully connected layer to project to the size of the class
 
         # you can either use torch LSTM or manually define it
-        self.lstm = nn.LSTM(input_size=self.input_dim, hidden_size=self.hidden_size, num_layers=self.num_layers, dropout=self.dropout)
-        self.fc_in = nn.Linear(self.input_dim, self.input_dim)
-        self.fc_out = nn.Linear(self.hidden_size, self.vocab_size)
-        self.relu = nn.ReLU(True)
+        self.lstm_cell = nn.LSTMCell(input_size=self.input_dim, hidden_size=hidden_size)
+        self.fc_out = nn.Linear(in_features=self.hidden_size, out_features=self.vocab_size)
+        self.embed = nn.Embedding(num_embeddings=self.vocab_size, embedding_dim=self.input_dim)
+        self.softmax = nn.Softmax(dim=1)
 
         ##############################################################################
         #                          END OF YOUR CODE                                  #
         ##############################################################################
 
-    def forward(self, feature, h, c):
+    def forward(self, images, labels):
         """
         For reference (shape example)
         feature: (Sequence_length, Batch_size, Input_dim)
@@ -152,23 +130,34 @@ class LSTM(nn.Module):
         # Problem2-2: Design LSTM model for letter sorting
         # NOTE: sequence length of feature can be various
 
-        feature = self.fc_in(feature)
-        output, h_next, c_next = self.lstm(feature, (h, c))
-        output = self.relu(self.fc_out(self.relu(output)))
+        hidden_state = torch.zeros(self.num_layers, images.size(0), self.hidden_size).cuda()
+        cell_state = torch.zeros(self.num_layers, images.size(0), self.hidden_size).cuda()
+
+        outputs = torch.empty((images.size(0), labels.size(1), self.vocab_size)).cuda()
+
+        labels_embed = self.embed(labels)
+
+        for t in range(labels.size(1)):
+            if t == 0:
+                hidden_state, cell_state = self.lstm_cell(images, (hidden_state, cell_state))
+            else:
+                hidden_state, cell_state = self.lstm_cell(labels_embed[t,:,:], (hidden_state, cell_state))
+            out = self.fc_out(hidden_state)
+            outputs[t,:,:] = out
 
         ##############################################################################
         #                          END OF YOUR CODE                                  #
         ##############################################################################
 
         # (sequence_length, batch, num_classes), (num_rnn_layers, batch, hidden_dim), (num_rnn_layers, batch, hidden_dim)
-        return output, h_next, c_next
+        return outputs
 
 
 class ConvLSTM(nn.Module):
     def __init__(self, sequence_length=5, num_classes=26, cnn_layers=None,
                  cnn_input_dim=1, rnn_input_dim=256,
                  cnn_hidden_size=256, rnn_hidden_size=512, rnn_num_layers=1,
-                 rnn_dropout=0, teacher_forcing=False, batch_size=256):
+                 rnn_dropout=0, batch_size=256):
         # NOTE: you can freely add hyperparameters argument
         super(ConvLSTM, self).__init__()
 
@@ -181,7 +170,6 @@ class ConvLSTM(nn.Module):
         self.rnn_dropout = rnn_dropout
         self.sequence_length = sequence_length
         self.num_classes = num_classes
-        self.teacher_forcing = teacher_forcing
         self.batch_size = batch_size
         ##############################################################################
         #                          IMPLEMENT YOUR CODE                               #
@@ -196,9 +184,8 @@ class ConvLSTM(nn.Module):
     def forward(self, inputs):
         """
         input is (images, labels) (training phase) or images (test phase)
-        images: sequential features of Batch size X (Sequence_length, Channel=1, Height, Width)
-        labels: Batch size X (Sequence_length)
-        outputs should be a size of Batch size X (1, Num_classes) or Batch size X (Sequence_length, Num_classes)
+        images: sequential features of [Batch size, Sequence_length, Channel=1, Height, Width]
+        labels: [Batch size, Sequence_length, Vocab_size]
         """
 
         # for teacher-forcing
@@ -217,29 +204,24 @@ class ConvLSTM(nn.Module):
         # NOTE: you can use teacher-forcing using labels or not
         # NOTE: you can modify below hint code
 
-        hidden_state = torch.zeros(self.rnn_num_layers, self.batch_size, self.rnn_hidden_size)
-        cell_state = torch.zeros(self.rnn_num_layers, self.batch_size, self.rnn_hidden_size)
-
-        outputs = []
+        img = images.view(images.size(0) * self.sequence_length, 1, 28, 28) # [BxS, C, H, W]
 
         if have_labels:
             # training code ...
             # teacher forcing by concatenating ()
-            conv_outs = self.conv(images)
-            if self.teacher_forcing:
-                # output of conv is a tensor with dim [B, S, H]
-                for label in labels: #TODO: manipulate labels to match the lstm input dimensions
-                    output, _, _ = self.lstm(label, hidden_state, cell_state)
-                    outputs.append(output)
-            else:
-                outputs, _, _ = self.lstm(conv_outs, hidden_state, cell_state)
+            conv_out = self.conv(img)
+            # [S, B, Hidden]
+            conv_outs = conv_out.view(images.size(0), self.sequence_length, -1).transpose(0,1).clone()
+            outputs = self.lstm(conv_outs, labels)
 
         else:
             # evaluation code ...
-            conv_outs = self.conv(images)
-            outputs, _, _ = self.lstm(conv_outs, hidden_state, cell_state)
+            conv_out = self.conv(img)
+            conv_outs = conv_out.view(images.size(0), self.sequence_length, -1).transpose(0,1).clone()  # [S, B, Hidden]
+            outputs = self.lstm(conv_outs, labels)
 
         ##############################################################################
         #                          END OF YOUR CODE                                  #
         ##############################################################################
         return outputs
+
