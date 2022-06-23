@@ -18,7 +18,7 @@ class Mydataset(Dataset):
             for i in range(10):
                 start_idx, end_idx = i * len_slices, (i+1) * len_slices
                 print(i, 'load from %d to %d' % (start_idx, end_idx))
-                cur_load_path = os.path.join(data_path, 'train_data_' + str(i) + '.npy')
+                cur_load_path = os.path.join(data_path, 'train_data_' + str(i) + '.npy')                
                 cur_load_dataset = np.load(cur_load_path, allow_pickle=True).item()
                 self.data.extend(cur_load_dataset['train_data'])
                 self.label.extend(cur_load_dataset['train_label'])
@@ -36,7 +36,7 @@ class Mydataset(Dataset):
                 self.label.extend(cur_load_dataset['valid_label'])
 
     def __getitem__(self, idx):
-        data, label = self.data[idx], self.label[idx]
+        data, label = self.data[idx], self.label[idx]        
         data_out = torch.zeros(data.shape)
         label_out = torch.tensor(np.array(label, dtype=int))
         if self.transform is not None:
@@ -51,9 +51,8 @@ class Mydataset(Dataset):
     def __len__(self):
         return len(self.data)
 
-
 def collate_fn(batch):
     img = [item[0].unsqueeze(1) for item in batch]
     label = [item[1] for item in batch]
-
+    
     return img, label

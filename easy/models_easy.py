@@ -4,14 +4,13 @@ import torch.nn.functional as F
 
 import numpy as np
 
-
 class CustomCNN(nn.Module):
     def __init__(self, cnn_hidden_size):
         super(CustomCNN, self).__init__()
 
         self.cnn_hidden_size = cnn_hidden_size
 
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=2 * self.cnn_hidden_size, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=2*self.cnn_hidden_size, kernel_size=3, padding=1)
         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.relu = nn.ReLU(True)
         self.fc = nn.Linear(2 * self.cnn_hidden_size * 14 * 14, 64)
@@ -24,12 +23,11 @@ class CustomCNN(nn.Module):
         """
 
         x = inputs.view(inputs.size(0) * inputs.size(1), 1, 28, 28)  # [BxS, C, H, W]
-        out = self.maxpool(self.relu(self.conv1(x)))  # [BxS, 2*hid, 14, 14]
-        out = out.view(-1, out.size(1) * out.size(2) * out.size(3))  # [BxS, 2*hid*14*14]
-        outputs = self.relu(self.fc(out)).cuda()  # [BxS, 64]
+        out = self.maxpool(self.relu(self.conv1(x))) # [BxS, 2*hid, 14, 14]
+        out = out.view(-1, out.size(1) * out.size(2) * out.size(3)) # [BxS, 2*hid*14*14]
+        outputs = self.relu(self.fc(out)).cuda() # [BxS, 64]
         outputs = outputs.view(inputs.size(0), inputs.size(1), -1)
         return outputs
-
 
 class LSTM(nn.Module):
     def __init__(self, input_dim, hidden_size, vocab_size, num_layers=1):
@@ -37,12 +35,12 @@ class LSTM(nn.Module):
 
         # define the properties
         self.input_dim = input_dim
-        self.hidden_size = hidden_size
+        self.hidden_size = hidden_size  
         self.vocab_size = vocab_size
         self.num_layers = num_layers
 
-        self.lstm = nn.LSTM(input_size=self.hidden_size, hidden_size=self.hidden_size,
-                            num_layers=self.num_layers, batch_first=True)
+        self.lstm = nn.LSTM(input_size=self.hidden_size, hidden_size=self.hidden_size, 
+                        num_layers=self.num_layers, batch_first=True)
         self.fc_in = nn.Linear(self.input_dim, self.hidden_size)
         self.fc_out = nn.Linear(self.hidden_size, self.vocab_size)
 
@@ -63,7 +61,7 @@ class LSTM(nn.Module):
 class ConvLSTM(nn.Module):
     def __init__(self, sequence_length=5, num_classes=26, cnn_layers=None,
                  cnn_input_dim=1, rnn_input_dim=256,
-                 cnn_hidden_size=256, rnn_hidden_size=512, rnn_num_layers=1,
+                 cnn_hidden_size=256, rnn_hidden_size=512, rnn_num_layers=1, 
                  batch_size=256):
         super(ConvLSTM, self).__init__()
 
@@ -91,14 +89,14 @@ class ConvLSTM(nn.Module):
             images, labels = inputs
         else:
             images = inputs
-
+        
         images = torch.stack(images, dim=0).cuda()
-
+        
         h0 = torch.zeros(self.rnn_num_layers, images.size(0), self.rnn_hidden_size).cuda()
         c0 = torch.zeros(self.rnn_num_layers, images.size(0), self.rnn_hidden_size).cuda()
 
-        conv_out = self.conv(images)  # [S, B, 64]
-        outputs, _, _ = self.lstm(conv_out, h0, c0)  # [S, B, 26]
+        conv_out = self.conv(images) # [S, B, 64]
+        outputs,_,_ = self.lstm(conv_out, h0, c0) # [S, B, 26]
         outputs = outputs.view(images.size(0), self.sequence_length, -1)
 
         return outputs
